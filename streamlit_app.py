@@ -8,7 +8,6 @@ import tempfile
 # 🔧 ffmpeg 경로 명시 (m4a 처리 안정화)
 AudioSegment.converter = which("ffmpeg")
 
-
 # 제목
 st.title("🎙️ V-Code Finder")
 st.subheader("당신의 목소리는 어떤 계절인가요?")
@@ -18,38 +17,35 @@ st.markdown("음성 파일을 업로드하면, 목소리의 특징을 분석해 
 uploaded_file = st.file_uploader("🎧 음성 파일(mp3, wav, m4a)을 업로드하세요", type=["mp3", "wav", "m4a"])
 
 if uploaded_file is not None:
-    # 확장자 확인
     file_suffix = uploaded_file.name.split('.')[-1]
 
-    # 원본 파일 임시 저장 (m4a 처리 안정화용)
+    # 임시 저장
     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_suffix}") as tmp_raw_file:
         tmp_raw_file.write(uploaded_file.read())
         tmp_raw_file.flush()
 
-        # AudioSegment로 변환
-        if file_suffix == "mp3":
-            audio = AudioSegment.from_file(tmp_raw_file.name, format="mp3")
-        elif file_suffix == "m4a":
-            audio = AudioSegment.from_file(tmp_raw_file.name, format="m4a")
-        else:
-            audio = AudioSegment.from_file(tmp_raw_file.name, format="wav")
+        # 오디오 로딩
+        try:
+            audio = AudioSegment.from_file(tmp_raw_file.name, format=file_suffix)
+        except Exception as e:
+            st.error(f"파일을 처리하는 중 오류가 발생했어요: {e}")
+            st.stop()
 
-        # wav 변환용 임시 파일 생성
+        # wav 변환용 임시 저장
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav_file:
             audio = audio.set_channels(1).set_frame_rate(22050)
             audio = audio[:5000]  # 앞 5초만 사용
             audio.export(tmp_wav_file.name, format="wav")
-
-            # librosa로 wav 로드
             y, sr = librosa.load(tmp_wav_file.name)
 
     # 분석
     pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
-    pitch = pitches[magnitudes > np.median(magnitudes)].mean()
+    valid_pitches = pitches[magnitudes > np.median(magnitudes)]
+    pitch = valid_pitches.mean() if valid_pitches.size > 0 else 0
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     energy = np.sum(y ** 2) / len(y)
 
-    # 결과 분류 기준
+    # 분류 기준
     def classify_voice(pitch, tempo, energy):
         if pitch > 180 and tempo > 100 and energy < 0.01:
             return "봄"
@@ -62,7 +58,7 @@ if uploaded_file is not None:
 
     season = classify_voice(pitch, tempo, energy)
 
-    # 결과 문구
+    # 결과 텍스트
     result_dict = {
         "봄": {
             "title": "☀️ 당신의 Voice Type은 [봄]입니다.",
@@ -82,10 +78,10 @@ if uploaded_file is not None:
         },
     }
 
-    # 결과 출력
+    # 출력
     st.markdown("---")
     st.success(result_dict[season]["title"])
     st.write(result_dict[season]["desc"])
     st.markdown("---")
-    st.markdown("🔍 더 정밀한 분석이 필요하다면? Speech Code 전문가 진단을 추천드려요.")
-
+    st.markdown("🔍 더 정밀한 분석이 필요하다면? **Speech Code 전문가 진단**을 추천드려요.")
+    st.caption(f"📊 분석 수치 → Pitch: {pitch:.2f}, Tempo: {tempo:.2f}, Energy: {energy:.5f}")
