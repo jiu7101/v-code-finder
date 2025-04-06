@@ -89,3 +89,4 @@ if uploaded_file is not None:
     st.markdown("---")
     st.markdown("🔍 더 정밀한 분석이 필요하다면? **Speech Code 전문가 진단**을 추천드려요.")
     st.caption(f"📊 분석 수치 → Pitch: {pitch:.2f}, Tempo: {tempo:.2f}, Energy: {energy:.5f}")
+
