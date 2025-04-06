@@ -1,46 +1,43 @@
 import streamlit as st
 import librosa
 import numpy as np
-from pydub import AudioSegment
-from pydub.utils import which
 import tempfile
+import subprocess
 import os
 
-# ffmpeg 경로 설정
-AudioSegment.converter = which("ffmpeg")
-
-# 제목 출력
 st.title("🎙️ V-Code Finder")
 st.subheader("당신의 목소리는 어떤 계절인가요?")
-st.markdown("음성 파일을 업로드하면, 목소리의 특징을 분석해 계절 유형을 알려드릴게요!")
+st.markdown("mp3, wav, m4a 파일을 업로드하면, 목소리의 특징을 분석해 계절 유형을 알려드릴게요!")
 
-# 파일 업로드
-uploaded_file = st.file_uploader("🎧 음성 파일(mp3, wav, m4a)을 업로드하세요", type=["mp3", "wav", "m4a"])
+uploaded_file = st.file_uploader("🎧 음성 파일을 업로드하세요", type=["mp3", "wav", "m4a"])
 
 if uploaded_file is not None:
-    file_suffix = uploaded_file.name.split('.')[-1].lower()
+    suffix = uploaded_file.name.split('.')[-1].lower()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_suffix}") as tmp_in:
-        tmp_in.write(uploaded_file.read())
-        tmp_in.flush()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{suffix}") as tmp_input:
+        tmp_input.write(uploaded_file.read())
+        tmp_input.flush()
 
-        try:
-            audio = AudioSegment.from_file(tmp_in.name, format=file_suffix)
-        except Exception as e:
-            st.error(f"파일을 처리하는 중 오류가 발생했어요: {e}")
-            st.stop()
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav:
-            audio = audio.set_channels(1).set_frame_rate(22050)
-            audio = audio[:5000]
-            audio.export(tmp_wav.name, format="wav")
-            y, sr = librosa.load(tmp_wav.name)
+        # ffmpeg로 wav 변환
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_output:
+            command = [
+                "ffmpeg", "-y", "-i", tmp_input.name,
+                "-ac", "1", "-ar", "22050",
+                "-t", "5",  # 앞 5초만
+                tmp_output.name
+            ]
+            try:
+                subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                y, sr = librosa.load(tmp_output.name)
+            except Exception as e:
+                st.error(f"❌ ffmpeg 변환 실패: {e}")
+                st.stop()
 
     if len(y) == 0:
-        st.error("❌ 음성 데이터가 비어 있습니다. 변환에 실패했을 수 있어요.")
+        st.error("❌ 변환된 오디오가 비어 있어요.")
         st.stop()
 
-    # 분석
+    # 음성 분석
     pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
     valid_pitches = pitches[magnitudes > np.median(magnitudes)]
     pitch = valid_pitches.mean() if valid_pitches.size > 0 else 0
@@ -60,7 +57,7 @@ if uploaded_file is not None:
 
     season = classify_voice(pitch, tempo, energy)
 
-    # 결과 문구
+    # 결과
     result_dict = {
         "봄": {
             "title": "☀️ 당신의 Voice Type은 [봄]입니다.",
@@ -80,10 +77,10 @@ if uploaded_file is not None:
         },
     }
 
-    # 결과 출력
     st.markdown("---")
     st.success(result_dict[season]["title"])
     st.write(result_dict[season]["desc"])
     st.markdown("---")
     st.markdown("🔍 더 정밀한 분석이 필요하다면? **Speech Code 전문가 진단**을 추천드려요.")
     st.caption(f"📊 분석 수치 → Pitch: {pitch:.2f}, Tempo: {tempo:.2f}, Energy: {energy:.5f}")
+
