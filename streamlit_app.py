@@ -5,22 +5,26 @@ from pydub import AudioSegment
 from pydub.utils import which
 import tempfile
 
-# 🔧 ffmpeg & ffprobe 경로 명시 (m4a 처리 안정화용)
+# 🔧 ffmpeg 경로 명시
 AudioSegment.converter = which("ffmpeg")
-AudioSegment.ffprobe = which("ffprobe")
 
-# 앱 제목
+# 제목
 st.title("🎙️ V-Code Finder")
 st.subheader("당신의 목소리는 어떤 계절인가요?")
 st.markdown("음성 파일을 업로드하면, 목소리의 특징을 분석해 계절 유형을 알려드릴게요!")
 
 # 파일 업로드
-uploaded_file = st.file_uploader("🎧 음성 파일(mp3, wav, m4a)을 업로드하세요", type=["mp3", "wav", "m4a"])
+uploaded_file = st.file_uploader("🎧 음성 파일(mp3 또는 wav)을 업로드하세요", type=["mp3", "wav"])
 
 if uploaded_file is not None:
-    file_suffix = uploaded_file.name.split('.')[-1]
+    file_suffix = uploaded_file.name.split('.')[-1].lower()
 
-    # 원본 파일 임시 저장 (m4a 포함 안정 처리)
+    # m4a 방지 로직
+    if file_suffix == "m4a":
+        st.error("현재 환경에서는 m4a 파일을 지원하지 않습니다. mp3 또는 wav 파일을 사용해 주세요.")
+        st.stop()
+
+    # 임시 저장
     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_suffix}") as tmp_raw_file:
         tmp_raw_file.write(uploaded_file.read())
         tmp_raw_file.flush()
@@ -34,7 +38,7 @@ if uploaded_file is not None:
         # wav로 변환
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav_file:
             audio = audio.set_channels(1).set_frame_rate(22050)
-            audio = audio[:5000]  # 앞 5초만 사용
+            audio = audio[:5000]
             audio.export(tmp_wav_file.name, format="wav")
             y, sr = librosa.load(tmp_wav_file.name)
 
@@ -85,4 +89,3 @@ if uploaded_file is not None:
     st.markdown("---")
     st.markdown("🔍 더 정밀한 분석이 필요하다면? **Speech Code 전문가 진단**을 추천드려요.")
     st.caption(f"📊 분석 수치 → Pitch: {pitch:.2f}, Tempo: {tempo:.2f}, Energy: {energy:.5f}")
-
