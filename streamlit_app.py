@@ -2,7 +2,12 @@ import streamlit as st
 import librosa
 import numpy as np
 from pydub import AudioSegment
+from pydub.utils import which
 import tempfile
+
+# 🔧 ffmpeg 경로 명시 (m4a 처리 안정화)
+AudioSegment.converter = which("ffmpeg")
+
 
 # 제목
 st.title("🎙️ V-Code Finder")
