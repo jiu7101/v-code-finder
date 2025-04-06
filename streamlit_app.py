@@ -11,16 +11,20 @@ st.subheader("당신의 목소리는 어떤 계절인가요?")
 st.markdown("음성 파일을 업로드하면, 목소리의 특징을 분석해 계절 유형을 알려드릴게요!")
 
 # 파일 업로드
-uploaded_file = st.file_uploader("🎧 음성 파일(mp3 또는 wav)을 업로드하세요", type=["mp3", "wav"])
+uploaded_file = st.file_uploader("🎧 음성 파일(mp3, wav, m4a)을 업로드하세요", type=["mp3", "wav", "m4a"])
 
 if uploaded_file is not None:
     # 임시 파일 저장
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_wav_file:
+        # 파일 형식 분기 처리
         if uploaded_file.type == "audio/mp3":
             audio = AudioSegment.from_file(uploaded_file, format="mp3")
+        elif uploaded_file.type == "audio/x-m4a" or uploaded_file.type == "audio/m4a":
+            audio = AudioSegment.from_file(uploaded_file, format="m4a")
         else:
             audio = AudioSegment.from_file(uploaded_file, format="wav")
 
+        # 오디오 처리
         audio = audio.set_channels(1).set_frame_rate(22050)
         audio = audio[:5000]  # 앞 5초만 사용
         audio.export(tmp_wav_file.name, format="wav")
